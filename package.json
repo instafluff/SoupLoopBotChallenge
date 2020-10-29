@@ -1,0 +1,37 @@
+{
+  "name": "souploopbotchallenge",
+  "version": "1.0.0",
+  "description": "AI Bot Challenge for Stuck in a Soup Loop!",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/instafluff/SoupLoopBotChallenge.git"
+  },
+  "keywords": [
+    "Ludum",
+    "Dare",
+    "Bot",
+    "Challenge",
+    "Instafluff",
+    "LD47",
+    "Soup",
+    "Game",
+    "Jam",
+    "Loop"
+  ],
+  "author": "Instafluff",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/instafluff/SoupLoopBotChallenge/issues"
+  },
+  "homepage": "https://github.com/instafluff/SoupLoopBotChallenge#readme",
+  "dependencies": {
+    "@nut-tree/nut-js": "^1.5.0",
+    "looks-same": "^7.2.3",
+    "sharp": "^0.26.2",
+    "tesseract.js": "^2.1.4"
+  }
+}
