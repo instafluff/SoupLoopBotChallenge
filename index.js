@@ -1,5 +1,4 @@
 const { keyboard, Key, mouse, straightTo, centerOf, left, right, up, down, screen, Region } = require("@nut-tree/nut-js");
-const Tesseract = require( "tesseract.js" );
 const sharp = require( "sharp" );
 const fs = require( "fs" );
 const looksSame = require( "looks-same" );
@@ -13,7 +12,7 @@ let sWidth = 1768, sHeight = 992;
 
 function isImageSame( img1, img2 ) {
 	return new Promise( res => {
-		looksSame( img1, img2, ( err, { equal } ) => {
+		looksSame( img1, img2, { tolerance: 5 }, ( err, { equal } ) => {
 			res( equal );
 		} );
 	} );
@@ -133,30 +132,38 @@ const start = async () => {
 }
 
 async function grabIngredient( ingredient, isFirst = false ) {
-	console.log( `Grabbing ${ingredient}` );
-	await findAndMove( `${ingredient}.png` );
-	await mouse.pressButton( 0 );
-	// if( isFirst ) {
-		await findAndMove( "spoon.png" );
-	// }
-	// else {
-		// await findAndMove( "spoon2.png" );
-	// }
-	await mouse.releaseButton( 0 );
+	try {
+		console.log( `Grabbing ${ingredient}` );
+		await findAndMove( `${ingredient}.png` );
+		await mouse.pressButton( 0 );
+		// if( isFirst ) {
+			await findAndMove( "spoon.png" );
+		// }
+		// else {
+			// await findAndMove( "spoon2.png" );
+		// }
+		await delay( 100 );
+		await mouse.releaseButton( 0 );
+		await delay( 100 );
+	}
+	catch( err ) {
+		console.log( `Error grabbing ${ingredient}`, err.message );
+	}
 }
 
 async function spinAndServe() {
+	await findAndMove( "spoon.png" );
 	await delay( 100 );
 	await mouse.pressButton( 0 );
-	await mouse.move( down( 20 ) );
-	await mouse.move( right( 10 ) );
-	await mouse.move( down( 20 ) );
-	await mouse.move( left( 100 ) );
-	await mouse.move( up( 20 ) );
-	await mouse.move( right( 10 ) );
-	await mouse.move( up( 20 ) );
-	await mouse.releaseButton( 0 );
+	await mouse.move( down( 40 ) );
+	await mouse.move( right( 20 ) );
+	await mouse.move( down( 40 ) );
+	await mouse.move( left( 140 ) );
+	await mouse.move( up( 40 ) );
+	await mouse.move( right( 20 ) );
+	await mouse.move( up( 40 ) );
 	await delay( 100 );
+	await mouse.releaseButton( 0 );
 	await findAndClick( "servesoup.png", 2000 );
 }
 
@@ -167,33 +174,29 @@ async function spinAndServe() {
 	await findAndClick( "rungame.png" );
 	await findAndClick( "start.png", 10000 );
 	await findAndClick( "next.png", 2000 );
+	let nextButton = objectCache[ "next.png" ];
 	for( let i = 0; i < 8; i++ ) {
 		await mouse.leftClick();
 		await delay( 100 );
 	}
+
 	for( let level = 0; true; level++ ) {
 		objectCache = {}; // Clear object cache
 		for( let round = 0; round < 3; round++ ) {
 			console.log( `ROUND #${round+1}` );
-			let numSoups = 6;
-			switch( level ) {
-			case 0:
-				numSoups = 6;
-				if( round > 0 ) {
-					numSoups = 5;
+			while( true ) {
+				await screen.capture( "capture.png" );
+				await sharp( fs.readFileSync( "capture.png" ) ).extract( {
+					width: Math.floor( nextButton.width ), height: Math.floor( nextButton.height ),
+					left: Math.floor( nextButton.left ), top: Math.floor( nextButton.top )
+				} ).toFile( `nextButtonArea.png` );
+				if( await isImageSame( `nextButton.png`, `nextButtonArea.png` ) ) {
+					console.log( "NEXT BUTTON DETECTED!" );
+					// Found a next button! it's the next round!
+					break;
 				}
-				break;
-			case 1:
-				numSoups = 9;
-				if( round === 1 ) {
-					numSoups = 7;
-				}
-				else if( round > 1 ) {
-					numSoups = 5;
-				}
-			}
-			for( let r = 0; r < numSoups; r++ ) {
-				console.log( `Detecting Recipe for Soup #${r+1}!` );
+
+				console.log( `Detecting Recipe for Soup!` );
 				let soupRegion = await findOrNull( "soupstogo.png" );
 				if( fs.existsSync( "capture.png" ) ) {
 					try {
@@ -207,58 +210,52 @@ async function spinAndServe() {
 				await sharp( fs.readFileSync( "capture.png" ) ).extract( {
 					width: Math.floor( soupRegion.width * 1.85 ), height: Math.floor( soupRegion.height ),
 					left: Math.floor( soupRegion.left - soupRegion.width * 0.4 ), top: Math.floor( soupRegion.top + soupRegion.height * 1.275 )
-				} ).toFile( `recipe_${r+1}.png` );
-
-				// OCR THINGS
-				// let ocrData = await Tesseract.recognize( `recipe_${r+1}.png`, "eng", {
-				// 	// logger: m => console.log( m )
-				// });
-				// console.log( ocrData.data.text );
-				// let recipeText = ocrData.data.text.toLowerCase();
+				} ).toFile( `recipe.png` );
 
 				// IMAGE COMPARISON THINGS
-				if( await isImageSame( `recipe_${r+1}.png`, `soup_tomato.png` ) ) {
+				if( await isImageSame( `recipe.png`, `soup_tomato.png` ) ) {
 					recipeText = "tomato soup";
 				}
-				else if( await isImageSame( `recipe_${r+1}.png`, `soup_onion.png` ) ) {
+				else if( await isImageSame( `recipe.png`, `soup_onion.png` ) ) {
 					recipeText = "onion soup";
 				}
-				else if( await isImageSame( `recipe_${r+1}.png`, `soup_zucchini.png` ) ) {
+				else if( await isImageSame( `recipe.png`, `soup_zucchini.png` ) ) {
 					recipeText = "zucchini soup";
 				}
-				else if( await isImageSame( `recipe_${r+1}.png`, `soup_veggie.png` ) ) {
+				else if( await isImageSame( `recipe.png`, `soup_veggie.png` ) ) {
 					recipeText = "veggie soup";
 				}
-				else if( await isImageSame( `recipe_${r+1}.png`, `soup_gaspacho.png` ) ) {
+				else if( await isImageSame( `recipe.png`, `soup_gaspacho.png` ) ) {
 					recipeText = "gaspacho";
 				}
-				else if( await isImageSame( `recipe_${r+1}.png`, `soup_pepper.png` ) ) {
+				else if( await isImageSame( `recipe.png`, `soup_pepper.png` ) ) {
 					recipeText = "pepper soup";
 				}
-				else if( await isImageSame( `recipe_${r+1}.png`, `soup_minestrone.png` ) ) {
+				else if( await isImageSame( `recipe.png`, `soup_minestrone.png` ) ) {
 					recipeText = "minestrone";
 				}
-				else if( await isImageSame( `recipe_${r+1}.png`, `soup_shroomveloute.png` ) ) {
+				else if( await isImageSame( `recipe.png`, `soup_shroomveloute.png` ) ) {
 					recipeText = "shroom veloute";
 				}
-				else if( await isImageSame( `recipe_${r+1}.png`, `soup_chickenmushroom.png` ) ) {
+				else if( await isImageSame( `recipe.png`, `soup_chickenmushroom.png` ) ) {
 					recipeText = "chicken mushroom";
 				}
-				else if( await isImageSame( `recipe_${r+1}.png`, `soup_harira.png` ) ) {
+				else if( await isImageSame( `recipe.png`, `soup_harira.png` ) ) {
 					recipeText = "harira";
 				}
-				else if( await isImageSame( `recipe_${r+1}.png`, `soup_ramenbroth.png` ) ) {
+				else if( await isImageSame( `recipe.png`, `soup_ramenbroth.png` ) ) {
 					recipeText = "ramen broth";
 				}
-				else {
-					// OCR THINGS
-					let ocrData = await Tesseract.recognize( `recipe_${r+1}.png`, "eng", {
-						// logger: m => console.log( m )
-					});
-					recipeText = ocrData.data.text.toLowerCase();
+				else if( await isImageSame( `recipe.png`, `soup_crustedsoup.png` ) ) {
+					recipeText = "crusted soup";
 				}
-				// console.log( recipeText );
-				if( recipeText.includes( "tomato" ) || recipeText.includes( "tomto" ) ) {
+				else if( await isImageSame( `recipe.png`, `soup_bouillabaisse.png` ) ) {
+					recipeText = "bouillabaisse";
+				}
+				else if( await isImageSame( `recipe.png`, `soup_jumboshrimpbisque.png` ) ) {
+					recipeText = "jumbo shrimp bisque";
+				}
+				if( recipeText === "tomato soup" ) {
 					console.log( "TOMATO SOUP" );
 					// screen.highlight( adjustCoords( tomato ) );
 					await grabIngredient( "tomato", true );
@@ -266,7 +263,7 @@ async function spinAndServe() {
 					await grabIngredient( "tomato" );
 					await spinAndServe();
 				}
-				else if( recipeText.includes( "onion" ) || recipeText.includes( "onon" ) ) {
+				else if( recipeText === "onion soup" ) {
 					console.log( "ONION SOUP" );
 					// screen.highlight( adjustCoords( tomato ) );
 					await grabIngredient( "onion", true );
@@ -274,7 +271,7 @@ async function spinAndServe() {
 					await grabIngredient( "onion" );
 					await spinAndServe();
 				}
-				else if( recipeText.includes( "zullhing" ) || recipeText.includes( "zu" ) ) {
+				else if( recipeText === "zucchini soup" ) {
 					console.log( "ZUCCHINI SOUP" );
 					// screen.highlight( adjustCoords( tomato ) );
 					await grabIngredient( "zucchini", true );
@@ -282,7 +279,7 @@ async function spinAndServe() {
 					await grabIngredient( "zucchini" );
 					await spinAndServe();
 				}
-				else if( recipeText.includes( "veggie" ) || recipeText.includes( "veg" ) ) {
+				else if( recipeText === "veggie soup" ) {
 					console.log( "VEGGIE SOUP" );
 					// screen.highlight( adjustCoords( tomato ) );
 					await grabIngredient( "tomato", true );
@@ -290,7 +287,7 @@ async function spinAndServe() {
 					await grabIngredient( "onion" );
 					await spinAndServe();
 				}
-				else if( recipeText.includes( "gaspalho" ) || recipeText.includes( "gas" ) ) {
+				else if( recipeText === "gaspacho" ) {
 					console.log( "GASPACHO" );
 					// screen.highlight( adjustCoords( tomato ) );
 					await grabIngredient( "tomato", true );
@@ -301,7 +298,7 @@ async function spinAndServe() {
 					await grabIngredient( "onion" );
 					await spinAndServe();
 				}
-				else if( recipeText.includes( "minestrone" ) || recipeText.includes( "mine" ) ) {
+				else if( recipeText === "minestrone" ) {
 					console.log( "MINESTRONE" );
 					// screen.highlight( adjustCoords( tomato ) );
 					await grabIngredient( "tomato", true );
@@ -312,7 +309,7 @@ async function spinAndServe() {
 					await grabIngredient( "onion" );
 					await spinAndServe();
 				}
-				else if( recipeText.includes( "veloute" ) ) {
+				else if( recipeText === "shroom veloute" ) {
 					console.log( "SHROOM VELOUTE" );
 					// screen.highlight( adjustCoords( tomato ) );
 					await grabIngredient( "mushroom", true );
@@ -321,7 +318,7 @@ async function spinAndServe() {
 					await grabIngredient( "onion" );
 					await spinAndServe();
 				}
-				else if( recipeText.includes( "pepper" ) || recipeText.includes( "pep" ) ) {
+				else if( recipeText === "pepper soup" ) {
 					console.log( "PEPPER SOUP" );
 					// screen.highlight( adjustCoords( tomato ) );
 					await grabIngredient( "pepper", true );
@@ -330,7 +327,7 @@ async function spinAndServe() {
 					await grabIngredient( "onion" );
 					await spinAndServe();
 				}
-				else if( recipeText.includes( "chicken" ) || recipeText.includes( "chic" ) ) {
+				else if( recipeText === "chicken mushroom" ) {
 					console.log( "CHICKEN MUSHROOM" );
 					// screen.highlight( adjustCoords( tomato ) );
 					await grabIngredient( "mushroom", true );
@@ -339,7 +336,7 @@ async function spinAndServe() {
 					await grabIngredient( "chicken" );
 					await spinAndServe();
 				}
-				else if( recipeText.includes( "harira" ) || recipeText.includes( "hari" ) ) {
+				else if( recipeText === "harira" ) {
 					console.log( "HARIRA" );
 					// screen.highlight( adjustCoords( tomato ) );
 					await grabIngredient( "tomato", true );
@@ -352,25 +349,59 @@ async function spinAndServe() {
 					await grabIngredient( "steak" );
 					await spinAndServe();
 				}
-				else if( recipeText.includes( "ramen" ) || recipeText.includes( "ram" ) ) {
+				else if( recipeText === "ramen broth" ) {
 					console.log( "RAMEN BROTH" );
 					// screen.highlight( adjustCoords( tomato ) );
-					await grabIngredient( "mushrom", true );
+					await grabIngredient( "mushroom", true );
 					await grabIngredient( "chicken" );
 					await grabIngredient( "onion" );
 					await grabIngredient( "fish" );
 					await spinAndServe();
 				}
-				await delay( 100 );
+				else if( recipeText === "crusted soup" ) {
+					console.log( "CRUSTED SOUP" );
+					// screen.highlight( adjustCoords( tomato ) );
+					await grabIngredient( "mushroom", true );
+					await grabIngredient( "mushroom" );
+					await grabIngredient( "carrot" );
+					await grabIngredient( "carrot" );
+					await grabIngredient( "onion" );
+					await grabIngredient( "steak" );
+					await spinAndServe();
+				}
+				else if( recipeText === "bouillabaisse" ) {
+					console.log( "BOUILLABAISSE" );
+					// screen.highlight( adjustCoords( tomato ) );
+					await grabIngredient( "pepper", true );
+					await grabIngredient( "tomato" );
+					await grabIngredient( "tomato" );
+					await grabIngredient( "onion" );
+					await grabIngredient( "fish" );
+					await grabIngredient( "fish" );
+					await spinAndServe();
+				}
+				else if( recipeText === "jumbo shrimp bisque" ) {
+					console.log( "JUMBO SHRIMP BISQUE" );
+					// screen.highlight( adjustCoords( tomato ) );
+					await grabIngredient( "shrimp", true );
+					await grabIngredient( "shrimp" );
+					await grabIngredient( "shrimp" );
+					await grabIngredient( "shrimp" );
+					await grabIngredient( "shrimp" );
+					await grabIngredient( "tomato" );
+					await spinAndServe();
+				}
+				await delay( 200 );
 			}
 			// Click Next
 			await findAndClick( "next.png", 2000 );
 		}
+		console.log( `LEVEL ${level+1} COMPLETE!` );
 		// Click Next
 		await findAndClick( "next.png", 2000 );
 		for( let i = 0; i < 5; i++ ) {
 			await mouse.leftClick();
-			await delay( 100 );
+			await delay( 200 );
 		}
 	}
 })();
